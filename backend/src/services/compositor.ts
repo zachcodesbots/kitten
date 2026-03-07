@@ -2,7 +2,7 @@ import sharp from 'sharp';
 import { v4 as uuidv4 } from 'uuid';
 import { uploadBuffer, getPublicUrl } from '../utils/storage';
 
-const FONT_SIZE = 52;
+const FONT_SIZE = 58;
 const PADDING = 40;
 
 function wrapText(text: string, maxCharsPerLine: number): string[] {
@@ -33,28 +33,27 @@ function escapeXml(str: string): string {
 
 export async function compositeTextOnImage(
   imageBuffer: Buffer,
-  text: string
+  text: string,
+  isFirst: boolean = false
 ): Promise<Buffer> {
-  const img = sharp(imageBuffer);
+  const TARGET_WIDTH = 1080;
+  const TARGET_HEIGHT = 1350; // 4:5 ratio, common for TikTok slideshows
+  const normalizedBuffer = await sharp(imageBuffer)
+    .resize(TARGET_WIDTH, TARGET_HEIGHT, { fit: 'cover', position: 'centre' })
+    .toBuffer();
+  const img = sharp(normalizedBuffer);
   const meta = await img.metadata();
-  const width = meta.width || 1080;
-  const height = meta.height || 1080;
-
-  const maxChars = Math.floor((width - PADDING * 2) / (FONT_SIZE * 0.55));
+  const width = meta.width || TARGET_WIDTH;
+  const height = meta.height || TARGET_HEIGHT;
+  const textWidth = width * 0.75;
+  const maxChars = Math.floor((textWidth - PADDING * 2) / (FONT_SIZE * 0.55));
   const lines = wrapText(text, maxChars);
   const lineHeight = FONT_SIZE * 1.3;
   const blockHeight = lines.length * lineHeight + PADDING * 2;
-  const blockY = height - blockHeight - PADDING;
+  const blockY = !isFirst ? height - blockHeight - PADDING * 6 : height - blockHeight - PADDING * 22;
 
   const textSvg = `
     <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="scrim" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="black" stop-opacity="0"/>
-          <stop offset="100%" stop-color="black" stop-opacity="0.72"/>
-        </linearGradient>
-      </defs>
-      <rect x="0" y="${blockY - 40}" width="${width}" height="${blockHeight + 80}" fill="url(#scrim)"/>
       ${lines.map((line, i) => `
         <text
           x="${width / 2}"
@@ -66,13 +65,13 @@ export async function compositeTextOnImage(
           text-anchor="middle"
           paint-order="stroke"
           stroke="black"
-          stroke-width="4"
+          stroke-width="10"
           stroke-linejoin="round"
         >${escapeXml(line)}</text>
       `).join('')}
     </svg>`;
 
-  return sharp(imageBuffer)
+  return sharp(normalizedBuffer)
     .composite([{ input: Buffer.from(textSvg), blend: 'over' }])
     .jpeg({ quality: 90 })
     .toBuffer();
@@ -86,10 +85,11 @@ export async function fetchImageBuffer(url: string): Promise<Buffer> {
 
 export async function compositeAndUpload(
   imageUrl: string,
-  text: string
+  text: string,
+  isFirst: boolean = false
 ): Promise<string> {
   const original = await fetchImageBuffer(imageUrl);
-  const composited = await compositeTextOnImage(original, text);
+  const composited = await compositeTextOnImage(original, text, isFirst);
   const key = `composited/${uuidv4()}.jpg`;
   await uploadBuffer(composited, key, 'image/jpeg');
   return getPublicUrl(key);

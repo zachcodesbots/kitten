@@ -83,7 +83,8 @@ export class GenerationService {
         let compositedUrl: string | null = null;
         if (image.public_url && generatedText) {
           try {
-            compositedUrl = await compositeAndUpload(image.public_url, generatedText);
+            const isCTA = (slide.bucket_name || '').toLowerCase().includes('cta');
+            compositedUrl = await compositeAndUpload(image.public_url, generatedText, isCTA);
           } catch (e) {
             console.error(`Compositing failed for slide ${i + 1}:`, e);
           }
@@ -146,8 +147,10 @@ export class GenerationService {
 
     // Get existing slides with their images
     const slides = await getMany<RunSlide>(
-      `SELECT rs.*, bi.public_url as image_url, bi.filename as image_filename
-      FROM run_slides rs LEFT JOIN bucket_images bi ON bi.id = rs.selected_image_id
+      `SELECT rs.*, bi.public_url as image_url, bi.filename as image_filename, b.name as bucket_name
+      FROM run_slides rs 
+      LEFT JOIN bucket_images bi ON bi.id = rs.selected_image_id
+      LEFT JOIN buckets b ON b.id = rs.bucket_id
       WHERE rs.run_id = $1 ORDER BY rs.position ASC`,
       [run.id]
     );
@@ -192,7 +195,8 @@ export class GenerationService {
       let compositedUrl: string | null = null;
       if (slides[i].image_url && text) {
         try {
-          compositedUrl = await compositeAndUpload(slides[i].image_url!, text);
+          const isCTA = (slides[i].bucket_name || '').toLowerCase().includes('cta');
+          compositedUrl = await compositeAndUpload(slides[i].image_url!, text, isCTA);
         } catch (e) {
           console.error(`Compositing failed for slide ${i + 1}:`, e);
         }
