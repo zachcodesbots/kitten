@@ -29,7 +29,13 @@ router.post('/login', async (req: Request, res: Response) => {
     req.session.userId = user.id;
     req.session.username = user.username;
 
-    res.json({ success: true, user: { id: user.id, username: user.username } });
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error:', err);
+        return res.status(500).json({ error: 'Session save failed' });
+      }
+      res.json({ success: true, user: { id: user.id, username: user.username } });
+    });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ error: 'Internal server error' });
