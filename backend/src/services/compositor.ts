@@ -1,10 +1,6 @@
 import sharp from 'sharp';
 import { v4 as uuidv4 } from 'uuid';
 import { uploadBuffer, getPublicUrl } from '../utils/storage';
-import { readFileSync } from 'fs';
-import { join } from 'path';
-
-const fontBase64 = readFileSync(join(__dirname, '../assets/TikTokSans-Medium.ttf')).toString('base64');
 
 const FONT_SIZE = 52;
 const PADDING = 40;
@@ -53,13 +49,6 @@ export async function compositeTextOnImage(
   const textSvg = `
     <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <style>
-          @font-face {
-            font-family: 'TikTokSans';
-            src: url('data:font/truetype;base64,${fontBase64}');
-            font-weight: 500;
-          }
-        </style>
         <linearGradient id="scrim" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stop-color="black" stop-opacity="0"/>
           <stop offset="100%" stop-color="black" stop-opacity="0.72"/>
@@ -70,7 +59,7 @@ export async function compositeTextOnImage(
         <text
           x="${width / 2}"
           y="${blockY + PADDING + i * lineHeight + FONT_SIZE}"
-          font-family="TikTokSans, Arial, sans-serif"
+          font-family="TikTok Sans, Arial, sans-serif"
           font-weight="500"
           font-size="${FONT_SIZE}"
           fill="white"
