@@ -11,5 +11,6 @@ COPY package*.json ./
 RUN npm install --production
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/src/db/schema.sql ./dist/db/schema.sql
+COPY --from=builder /app/src/assets ./dist/assets
 EXPOSE 4000
 CMD ["node", "dist/index.js"]
