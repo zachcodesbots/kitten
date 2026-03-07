@@ -15,6 +15,7 @@ import settingsRoutes from './routes/settings';
 dotenv.config();
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = parseInt(process.env.PORT || '4000');
 const PgSession = connectPgSimple(session);
 
