@@ -111,6 +111,7 @@ export interface RunSlide {
   updated_at: string;
   image_url?: string;
   image_filename?: string;
+  bucket_name?: string;
 }
 
 export interface ExportTask {
