@@ -100,6 +100,7 @@ export interface RunSlide {
   image_url?: string;
   image_filename?: string;
   composited_image_url?: string | null;
+  bucket_name?: string;
 }
 
 export interface ExportTask {

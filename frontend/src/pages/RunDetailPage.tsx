@@ -190,12 +190,12 @@ export default function RunDetailPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {run.slides?.map((slide, idx) => (
           <div key={slide.id} className="card overflow-hidden">
-            <div className="aspect-[9/16] bg-surface-100 relative">
+            <div className="bg-surface-100 relative">
               {slide.image_url ? (
                 <img
                   src={slide.composited_image_url || slide.image_url}
                   alt={`Slide ${idx + 1}`}
-                  className="w-full h-full object-cover"
+                  className="w-full h-auto"
                 />
               ) : (
                 <div className="flex items-center justify-center h-full text-surface-400 text-sm">No image</div>
