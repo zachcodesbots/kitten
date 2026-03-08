@@ -100,24 +100,63 @@ router.get('/accounts', async (_req: Request, res: Response) => {
 });
 
 // TikTok connect init
-router.post('/accounts/tiktok/connect-init', async (_req: Request, res: Response) => {
+// Save upload-post.com API token
+// Save upload-post.com account
+router.post('/accounts/upload-post/connect', async (req: Request, res: Response) => {
   try {
-    const clientKey = process.env.TIKTOK_CLIENT_KEY;
-    const redirectUri = process.env.TIKTOK_REDIRECT_URI;
-
-    if (!clientKey || !redirectUri) {
-      return res.status(400).json({ error: 'TikTok credentials not configured' });
+    const { profile_username, label } = req.body;
+    if (!profile_username) {
+      return res.status(400).json({ error: 'Profile username required' });
     }
 
-    // TikTok Content Posting API OAuth URL
-    const scope = 'user.info.basic,video.publish,video.upload';
-    const state = Math.random().toString(36).substring(7);
-    const authUrl = `https://www.tiktok.com/v2/auth/authorize/?client_key=${clientKey}&scope=${scope}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
+    const apiToken = process.env.UPLOAD_POST_API_TOKEN;
+    if (!apiToken) return res.status(500).json({ error: 'UPLOAD_POST_API_TOKEN not configured' });
 
-    res.json({ auth_url: authUrl, state });
+    const profileRes = await fetch(`https://api.upload-post.com/api/uploadposts/users/${profile_username}`, {
+      headers: { 'Authorization': `Apikey ${apiToken}` },
+    });
+    const profileData = await profileRes.json() as any;
+    if (!profileData.success) {
+      return res.status(400).json({ error: 'Profile not found on upload-post.com' });
+    }
+
+    const tiktok = profileData.profile?.social_accounts?.tiktok;
+    if (!tiktok) {
+      return res.status(400).json({ error: 'No TikTok account connected to this profile' });
+    }
+
+    const displayName = tiktok.display_name || profile_username;
+
+    const account = await getOne(
+      `INSERT INTO connected_accounts 
+        (provider, label, external_account_id, profile_username, is_active)
+       VALUES ('tiktok', $1, $2, $3, true)
+       ON CONFLICT (provider, external_account_id) DO UPDATE SET
+         label = $1, profile_username = $3, is_active = true
+       RETURNING id, provider, label, external_account_id, profile_username, is_active`,
+      [label || displayName, profile_username, profile_username]
+    );
+
+    res.json({ success: true, account });
   } catch (err) {
-    console.error('TikTok connect init error:', err);
-    res.status(500).json({ error: 'Failed to init TikTok connection' });
+    console.error('upload-post connect error:', err);
+    res.status(500).json({ error: 'Failed to save connection' });
+  }
+});
+
+// Fetch profiles from upload-post.com (to help user pick)
+router.get('/accounts/upload-post/profiles', async (req: Request, res: Response) => {
+  try {
+    const { api_token } = req.query;
+    if (!api_token) return res.status(400).json({ error: 'api_token required' });
+
+    const r = await fetch('https://api.upload-post.com/api/uploadposts/users', {
+      headers: { 'Authorization': `Apikey ${api_token}` },
+    });
+    const data = await r.json() as any;
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch profiles' });
   }
 });
 

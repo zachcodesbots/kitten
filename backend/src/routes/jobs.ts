@@ -28,14 +28,14 @@ router.post('/', async (req: Request, res: Response) => {
   try {
     const {
       name, general_prompt, slide_count, is_active, require_approval,
-      auto_approved, timezone, slides, schedule,
+      auto_approved, timezone, target_account_id, slides, schedule,
     } = req.body;
 
     if (!name) return res.status(400).json({ error: 'Job name required' });
 
     const job = await getOne<Job>(
-      `INSERT INTO jobs (name, general_prompt, slide_count, is_active, require_approval, auto_approved, timezone)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      `INSERT INTO jobs (name, general_prompt, slide_count, is_active, require_approval, auto_approved, timezone, target_account_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
       [
         name,
         general_prompt || null,
@@ -44,6 +44,7 @@ router.post('/', async (req: Request, res: Response) => {
         require_approval !== false,
         auto_approved || false,
         timezone || 'UTC',
+        target_account_id || null,
       ]
     );
 
@@ -100,7 +101,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
   try {
     const {
       name, general_prompt, slide_count, is_active, require_approval,
-      auto_approved, timezone, slides, schedule,
+      auto_approved, timezone, target_account_id, slides, schedule,
     } = req.body;
 
     const fields: string[] = [];
@@ -114,7 +115,8 @@ router.patch('/:id', async (req: Request, res: Response) => {
     if (require_approval !== undefined) { fields.push(`require_approval = $${idx++}`); values.push(require_approval); }
     if (auto_approved !== undefined) { fields.push(`auto_approved = $${idx++}`); values.push(auto_approved); }
     if (timezone !== undefined) { fields.push(`timezone = $${idx++}`); values.push(timezone); }
-
+    if (target_account_id !== undefined) { fields.push(`target_account_id = $${idx++}`); values.push(target_account_id || null); }
+    
     if (fields.length > 0) {
       values.push(req.params.id);
       await query(`UPDATE jobs SET ${fields.join(', ')} WHERE id = $${idx}`, values);

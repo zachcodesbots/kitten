@@ -112,6 +112,7 @@ export interface RunSlide {
   image_url?: string;
   image_filename?: string;
   bucket_name?: string;
+  composited_image_url?: string | null;
 }
 
 export interface ExportTask {
@@ -134,6 +135,7 @@ export interface ConnectedAccount {
   token_expires_at: string | null;
   created_at: string;
   updated_at: string;
+  profile_username?: string | null;
 }
 
 export interface AppSetting {

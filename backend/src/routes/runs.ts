@@ -82,24 +82,26 @@ router.post('/:id/approve', async (req: Request, res: Response) => {
     await query(`UPDATE runs SET status = 'approved' WHERE id = $1`, [req.params.id]);
 
     // Queue export task
-    const account = await getOne(
-      `SELECT id FROM connected_accounts WHERE provider = 'tiktok' AND is_active = true LIMIT 1`
+    const job = await getOne<{ target_account_id: string }>(
+      'SELECT target_account_id FROM jobs WHERE id = $1', [run.job_id]
     );
+    if (!job?.target_account_id) return res.status(400).json({ error: 'No account configured for this job. Set one in Job settings.' });
 
-    if (account) {
-      await query(
-        `INSERT INTO export_tasks (run_id, account_id, status) VALUES ($1, $2, 'queued')`,
-        [req.params.id, account.id]
-      );
-      await query(`UPDATE runs SET status = 'exporting' WHERE id = $1`, [req.params.id]);
-    }
+    await query(
+      `UPDATE runs SET status = 'exporting', account_id = $1 WHERE id = $2`,
+      [job.target_account_id, req.params.id]
+    );
+    await query(
+      `INSERT INTO export_tasks (run_id, account_id, status) VALUES ($1, $2, 'queued')`,
+      [req.params.id, job.target_account_id]
+    );
 
     // Optionally enable auto-approve for the job
     if (enable_auto_approved_for_job) {
       await query('UPDATE jobs SET auto_approved = true WHERE id = $1', [run.job_id]);
     }
 
-    res.json({ success: true, export_queued: !!account });
+    res.json({ success: true, export_queued: true });
   } catch (err) {
     console.error('Approve error:', err);
     res.status(500).json({ error: 'Failed to approve run' });
@@ -152,15 +154,15 @@ router.post('/:id/retry-export', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Can only retry failed runs' });
     }
 
-    const account = await getOne(
-      `SELECT id FROM connected_accounts WHERE provider = 'tiktok' AND is_active = true LIMIT 1`
+    const job = await getOne<{ target_account_id: string }>(
+      'SELECT target_account_id FROM jobs WHERE id = $1', [run.job_id]
     );
-    if (!account) return res.status(400).json({ error: 'No active TikTok account' });
+    if (!job?.target_account_id) return res.status(400).json({ error: 'No account configured for this job.' });
 
-    await query(`UPDATE runs SET status = 'exporting', error_message = NULL WHERE id = $1`, [req.params.id]);
+    await query(`UPDATE runs SET status = 'exporting', account_id = $1, error_message = NULL WHERE id = $2`, [job.target_account_id, req.params.id]);
     await query(
       `INSERT INTO export_tasks (run_id, account_id, status) VALUES ($1, $2, 'queued')`,
-      [req.params.id, account.id]
+      [req.params.id, job.target_account_id]
     );
 
     res.json({ success: true });
