@@ -2,7 +2,6 @@ import sharp from 'sharp';
 import { v4 as uuidv4 } from 'uuid';
 import { uploadBuffer, getPublicUrl } from '../utils/storage';
 
-const FONT_SIZE = 58;
 const PADDING = 40;
 
 function wrapText(text: string, maxCharsPerLine: number): string[] {
@@ -36,22 +35,19 @@ export async function compositeTextOnImage(
   text: string,
   isFirst: boolean = false
 ): Promise<Buffer> {
-  const TARGET_WIDTH = 1080;
-  const TARGET_HEIGHT = 1350; // 4:5 ratio, common for TikTok slideshows
-  const normalizedBuffer = await sharp(imageBuffer)
-    .resize(TARGET_WIDTH, TARGET_HEIGHT, { fit: 'cover', position: 'centre' })
-    .toBuffer();
-  const img = sharp(normalizedBuffer);
+  const img = sharp(imageBuffer);
   const meta = await img.metadata();
-  const width = meta.width || TARGET_WIDTH;
-  const height = meta.height || TARGET_HEIGHT;
+  const width = meta.width;
+  const height = meta.height;
   const textWidth = width * 0.75;
+  const FONT_SIZE = Math.round(width * 0.06);
   const maxChars = Math.floor((textWidth - PADDING * 2) / (FONT_SIZE * 0.55));
   const lines = wrapText(text, maxChars);
   const lineHeight = FONT_SIZE * 1.3;
   const blockHeight = lines.length * lineHeight + PADDING * 2;
-  const blockY = !isFirst ? height - blockHeight - PADDING * 6 : height - blockHeight - PADDING * 22;
-
+  const blockY = !isFirst 
+    ? height - blockHeight - height * 0.32
+    : height - blockHeight - height * 0.62;
   const textSvg = `
     <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
       ${lines.map((line, i) => `
@@ -65,13 +61,13 @@ export async function compositeTextOnImage(
           text-anchor="middle"
           paint-order="stroke"
           stroke="black"
-          stroke-width="10"
+          stroke-width="${Math.round(FONT_SIZE * 0.18)}"
           stroke-linejoin="round"
         >${escapeXml(line)}</text>
       `).join('')}
     </svg>`;
 
-  return sharp(normalizedBuffer)
+  return sharp(imageBuffer)
     .composite([{ input: Buffer.from(textSvg), blend: 'over' }])
     .jpeg({ quality: 90 })
     .toBuffer();
