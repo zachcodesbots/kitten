@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api';
-import { Bucket, JobSlide, JobSchedule } from '@/types';
+import { Bucket, JobSlide, JobSchedule, ConnectedAccount } from '@/types';
 import { Plus, Trash2, GripVertical, Save, ArrowLeft, Play, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -27,6 +27,8 @@ export default function JobEditorPage() {
   const [requireApproval, setRequireApproval] = useState(true);
   const [autoApproved, setAutoApproved] = useState(false);
   const [timezone, setTimezone] = useState('UTC');
+  const [targetAccountId, setTargetAccountId] = useState<string>('');
+  const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
 
   // Slides
   const [slides, setSlides] = useState<SlideRow[]>([
@@ -45,6 +47,7 @@ export default function JobEditorPage() {
 
   useEffect(() => {
     api.listBuckets().then(setBuckets).catch(() => {});
+    api.listAccounts().then((a: ConnectedAccount[]) => setAccounts(a.filter(acc => acc.is_active))).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -57,6 +60,7 @@ export default function JobEditorPage() {
       setRequireApproval(job.require_approval);
       setAutoApproved(job.auto_approved);
       setTimezone(job.timezone);
+      setTargetAccountId(job.target_account_id || '');
 
       if (job.slides && job.slides.length > 0) {
         setSlides(job.slides.map((s: any) => ({
@@ -91,6 +95,7 @@ export default function JobEditorPage() {
         require_approval: requireApproval,
         auto_approved: autoApproved,
         timezone,
+        target_account_id: targetAccountId || null,
         slides: slides.map((s, i) => ({
           position: i + 1,
           bucket_id: s.bucket_id,
@@ -210,6 +215,19 @@ export default function JobEditorPage() {
               <input type="checkbox" checked={autoApproved} onChange={e => setAutoApproved(e.target.checked)} className="rounded border-surface-300" />
               <span className="text-sm">Auto-approve scheduled runs</span>
             </label>
+            <div className="pt-1">
+              <label className="label">Post to TikTok Account</label>
+              {accounts.length === 0 ? (
+                <p className="text-xs text-surface-400">No accounts connected. <a href="/settings" className="underline">Add one in Settings.</a></p>
+              ) : (
+                <select className="input" value={targetAccountId} onChange={e => setTargetAccountId(e.target.value)}>
+                  <option value="">Select account...</option>
+                  {accounts.map(a => (
+                    <option key={a.id} value={a.id}>{a.label || a.external_account_id}</option>
+                  ))}
+                </select>
+              )}
+            </div>
           </div>
         </div>
 

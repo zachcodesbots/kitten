@@ -79,8 +79,9 @@ export const api = {
     return request<any[]>(`/runs${qs}`);
   },
   getRun: (id: string) => request<any>(`/runs/${id}`),
-  approveRun: (id: string, data?: { enable_auto_approved_for_job?: boolean }) =>
-    request<any>(`/runs/${id}/approve`, { method: 'POST', body: JSON.stringify(data || {}) }),
+  approveRun: (id: string, body: { enable_auto_approved_for_job?: boolean }) =>
+    request<any>(`/runs/${id}/approve`, { method: 'POST', body: JSON.stringify(body) }),
+
   rejectRun: (id: string) =>
     request<any>(`/runs/${id}/reject`, { method: 'POST' }),
   regenerateText: (id: string) =>
@@ -99,10 +100,11 @@ export const api = {
       method: 'POST', body: JSON.stringify({ current_password, new_password }),
     }),
   listAccounts: () => request<any[]>('/settings/accounts'),
-  initTikTokConnect: () =>
-    request<{ auth_url: string; state: string }>('/settings/accounts/tiktok/connect-init', { method: 'POST' }),
-  tiktokCallback: (code: string) =>
-    request<any>('/settings/accounts/tiktok/callback', { method: 'POST', body: JSON.stringify({ code }) }),
+  connectUploadPost: (profile_username: string, label?: string) =>
+    request<any>('/settings/accounts/upload-post/connect', {
+      method: 'POST',
+      body: JSON.stringify({ profile_username, label }),
+    }),
   disconnectAccount: (id: string) =>
     request<any>(`/settings/accounts/${id}`, { method: 'DELETE' }),
 };

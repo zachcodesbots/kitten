@@ -38,7 +38,7 @@ export interface Job {
   require_approval: boolean;
   auto_approved: boolean;
   timezone: string;
-  target_account_id: string | null;
+  target_account_id?: string | null;
   created_at: string;
   updated_at: string;
   slides?: JobSlide[];
@@ -119,4 +119,5 @@ export interface ConnectedAccount {
   external_account_id: string | null;
   is_active: boolean;
   token_expires_at: string | null;
+  profile_username?: string | null;
 }

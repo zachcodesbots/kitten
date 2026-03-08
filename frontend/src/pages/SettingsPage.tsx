@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { ConnectedAccount } from '@/types';
-import { statusColor, statusLabel } from '@/lib/utils';
 import { Key, Globe, Link, Unlink, Save, Loader2, Eye, EyeOff, ExternalLink, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -17,6 +16,8 @@ export default function SettingsPage() {
   const [defaultTimezone, setDefaultTimezone] = useState('UTC');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [uploadPostUsername, setUploadPostUsername] = useState('');
+  const [uploadPostLabel, setUploadPostLabel] = useState('');
 
   useEffect(() => {
     Promise.all([api.getSettings(), api.listAccounts()])
@@ -65,15 +66,6 @@ export default function SettingsPage() {
     }
   };
 
-  const handleConnectTikTok = async () => {
-    try {
-      const data = await api.initTikTokConnect();
-      window.open(data.auth_url, '_blank');
-    } catch (err: any) {
-      toast.error(err.message);
-    }
-  };
-
   const handleDisconnect = async (id: string) => {
     if (!confirm('Disconnect this account?')) return;
     try {
@@ -89,7 +81,7 @@ export default function SettingsPage() {
     return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-surface-400" /></div>;
   }
 
-  const activeTikTok = accounts.find(a => a.provider === 'tiktok' && a.is_active);
+  const tikTokAccounts = accounts.filter(a => a.provider === 'tiktok' && a.is_active);
 
   return (
     <div>
@@ -157,39 +149,69 @@ export default function SettingsPage() {
           </button>
         </div>
 
-        {/* TikTok Connection */}
         <div className="card p-5 space-y-3">
           <div className="flex items-center gap-2 mb-1">
             <ExternalLink className="w-4 h-4 text-surface-500" />
             <h2 className="font-semibold">TikTok Connection</h2>
           </div>
 
-          {activeTikTok ? (
-            <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-              <div className="flex items-center gap-2">
-                <span className="badge bg-green-100 text-green-700">Connected</span>
-                <span className="text-sm">{activeTikTok.label || 'TikTok Account'}</span>
-                {activeTikTok.token_expires_at && (
-                  <span className="text-xs text-surface-400">
-                    Expires: {new Date(activeTikTok.token_expires_at).toLocaleDateString()}
-                  </span>
-                )}
+<div className="space-y-2">
+            {tikTokAccounts.map(a => (
+              <div key={a.id} className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+                <div className="flex items-center gap-2">
+                  <span className="badge bg-green-100 text-green-700">Connected</span>
+                  <span className="text-sm">{a.label || 'TikTok Account'}</span>
+                </div>
+                <button onClick={() => handleDisconnect(a.id)} className="btn-ghost text-red-500 hover:bg-red-50">
+                  <Unlink className="w-4 h-4" /> Disconnect
+                </button>
               </div>
-              <button onClick={() => handleDisconnect(activeTikTok.id)} className="btn-ghost text-red-500 hover:bg-red-50">
-                <Unlink className="w-4 h-4" /> Disconnect
-              </button>
+            ))}
+          </div>
+
+          <div className="space-y-3 pt-1">
+            <div>
+              <label className="label">Profile Username</label>
+              <input
+                type="text"
+                className="input"
+                value={uploadPostUsername}
+                onChange={e => setUploadPostUsername(e.target.value)}
+                placeholder="upload-post.com profile username"
+              />
             </div>
-          ) : (
-            <div className="flex items-center justify-between p-3 bg-surface-50 rounded-lg">
-              <span className="text-sm text-surface-500">No TikTok account connected</span>
-              <button onClick={handleConnectTikTok} className="btn-primary">
-                <Link className="w-4 h-4" /> Connect TikTok
-              </button>
+            <div>
+              <label className="label">Label (optional)</label>
+              <input
+                type="text"
+                className="input"
+                value={uploadPostLabel}
+                onChange={e => setUploadPostLabel(e.target.value)}
+                placeholder="e.g. Gym Account"
+              />
             </div>
-          )}
-          <p className="text-xs text-surface-400">
-            Approved runs will be exported as drafts to your connected TikTok account.
-          </p>
+            <button
+              onClick={async () => {
+                if (!uploadPostUsername) { toast.error('Profile username required'); return; }
+                try {
+                  await api.connectUploadPost(uploadPostUsername, uploadPostLabel || uploadPostUsername);
+                  toast.success('TikTok account added');
+                  setUploadPostUsername('');
+                  setUploadPostLabel('');
+                  const a = await api.listAccounts();
+                  setAccounts(a);
+                } catch (err: any) {
+                  toast.error(err.message);
+                }
+              }}
+              className="btn-primary"
+            >
+              <Link className="w-4 h-4" /> Add Account
+            </button>
+            <p className="text-xs text-surface-400">
+              Sign up at <a href="https://upload-post.com" target="_blank" className="underline">upload-post.com</a>, connect your TikTok to a profile, then enter the profile username here.
+            </p>
+          </div>
         </div>
 
         {/* Password */}
