@@ -50,10 +50,11 @@ export class ExportService {
 
       const formData = new FormData();
       formData.append('user', profileUsername);
-      formData.append('title', 'the app is called "JournAI" btw #gymmotivation #motivation #fyp #fitness #discipline');
+      formData.append('tiktok_title', '');
+      formData.append('tiktok_description', 'the app is called "JournAI" btw #gymmotivation #motivation #fyp #fitness #discipline');
       formData.append('platform[]', 'tiktok');
-      formData.append('tiktokPrivacyLevel', 'SELF_ONLY');
-      formData.append('tiktokAutoAddMusic', 'false');
+      formData.append('post_mode', 'MEDIA_UPLOAD');
+      formData.append('auto_add_music', 'true');
       imageUrls.forEach(url => formData.append('photos[]', url));
 
       const response = await fetch('https://api.upload-post.com/api/upload_photos', {
