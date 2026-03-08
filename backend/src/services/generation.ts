@@ -32,17 +32,19 @@ export class GenerationService {
     if (!run) throw new Error('Failed to create run');
 
     try {
-      // Select images from each bucket
-      const selectedImages: { slide: JobSlide; image: BucketImage }[] = [];
-
+      // Fetch all available images per bucket for AI to choose from
+      const bucketImages: { slide: JobSlide; images: BucketImage[] }[] = [];
       for (const slide of job.slides) {
-        const image = await this.selectImageFromBucket(slide.bucket_id, []);
-        if (!image) throw new Error(`No active images in bucket for slide ${slide.position}`);
-        selectedImages.push({ slide, image });
+        const images = await getMany<BucketImage>(
+          `SELECT * FROM bucket_images WHERE bucket_id = $1 AND status = 'active'`,
+          [slide.bucket_id]
+        );
+        if (!images.length) throw new Error(`No active images in bucket for slide ${slide.position}`);
+        bucketImages.push({ slide, images });
       }
 
-      // Build prompt and generate text
-      const promptPayload = this.buildPrompt(job, selectedImages);
+      // Build prompt and generate text + image choices
+      const promptPayload = this.buildPrompt(job, bucketImages);
       const openai = await this.getOpenAIClient();
 
       const completion = await openai.chat.completions.create({
@@ -74,12 +76,16 @@ export class GenerationService {
       );
 
       // Create run slides
-      for (let i = 0; i < selectedImages.length; i++) {
-        const { slide, image } = selectedImages[i];
+      // Create run slides using AI-chosen images
+      for (let i = 0; i < bucketImages.length; i++) {
+        const { slide, images } = bucketImages[i];
         const slideKey = `slide_${i + 1}_text`;
-        const generatedText = generated[slideKey] || generated.slides?.[i]?.text || '';
+        const chosenFilename = generated[`slide_${i + 1}_image`];
+        const generatedText = generated[slideKey] || '';
 
-        // Composite text onto image
+        // Find the chosen image by filename, fall back to first if not found
+        const image = images.find(img => img.filename === chosenFilename) || images[0];
+
         let compositedUrl: string | null = null;
         if (image.public_url && generatedText) {
           try {
@@ -164,12 +170,13 @@ export class GenerationService {
       [job.id]
     );
 
-    const selectedImages = slides.map((s, i) => ({
-      slide: jobSlides[i] || { position: i + 1, bucket_id: s.bucket_id, prompt_override: null },
-      image: { filename: s.image_filename || 'image' } as BucketImage,
+    // For regenerate, wrap each existing image as a single-option bucket so AI "chooses" the same image
+    const bucketImages = slides.map((s, i) => ({
+      slide: jobSlides[i] || { position: i + 1, bucket_id: s.bucket_id, prompt_override: null } as JobSlide,
+      images: [{ filename: s.image_filename || 'image', id: s.selected_image_id } as BucketImage],
     }));
 
-    const promptPayload = this.buildPrompt(job, selectedImages);
+    const promptPayload = this.buildPrompt(job, bucketImages);
 
     const completion = await openai.chat.completions.create({
       model,
@@ -190,7 +197,7 @@ export class GenerationService {
     // Update slide texts
     for (let i = 0; i < slides.length; i++) {
       const slideKey = `slide_${i + 1}_text`;
-      const text = generated[slideKey] || generated.slides?.[i]?.text || '';
+      const text = generated[slideKey] || '';
 
       let compositedUrl: string | null = null;
       if (slides[i].image_url && text) {
@@ -254,35 +261,40 @@ export class GenerationService {
 
   private buildPrompt(
     job: Job,
-    selectedImages: { slide: JobSlide; image: BucketImage }[]
+    bucketImages: { slide: JobSlide; images: BucketImage[] }[]
   ): { system: string; user: string } {
-    const slideInstructions = selectedImages.map(({ slide, image }, i) => {
-      let instruction = `Slide ${i + 1}: Image file "${image.filename}"`;
+    const slideInstructions = bucketImages.map(({ slide, images }, i) => {
+      const fileList = images.map(img => `"${img.filename}"`).join(', ');
+      let instruction = `Slide ${i + 1}: Choose the best image from [${fileList}]`;
       if (slide.prompt_override) {
         instruction += ` — Special instruction: ${slide.prompt_override}`;
       }
       return instruction;
     }).join('\n');
 
-    const system = `You are a creative content writer for TikTok slideshow posts. Generate engaging, concise text for each slide that works well with the images. Keep text short and impactful — TikTok audiences scroll fast.
+    const system = `You are a creative content writer for TikTok slideshow posts. For each slide, you will be given a list of available image filenames. Choose the most fitting image and write engaging, concise text to accompany it. Keep text short and impactful — TikTok audiences scroll fast.
 
 Always respond with valid JSON in this exact format:
 {
   "post_title": "A catchy title for the post",
+  "slide_1_image": "chosen_filename.jpg",
   "slide_1_text": "Text for slide 1",
+  "slide_2_image": "chosen_filename.jpg",
   "slide_2_text": "Text for slide 2",
-  ... (one entry per slide)
+  ... (one image+text pair per slide)
   "caption": "A TikTok caption for the post",
   "hashtags": ["relevant", "hashtags", "here"]
-}`;
+}
 
-    const user = `${job.general_prompt || 'Create engaging slideshow text for these slides.'}
+Important: The slide_X_image value must be an exact filename from the provided options for that slide.`;
+
+    const user = `${job.general_prompt || 'Create engaging slideshow content for these slides.'}
 
 Slide sequence:
 ${slideInstructions}
 
-Number of slides: ${selectedImages.length}
-Generate text for each slide plus a caption and hashtags.`;
+Number of slides: ${bucketImages.length}
+For each slide, pick the best image filename from the options and write matching text. Then generate a caption and hashtags.`;
 
     return { system, user };
   }
