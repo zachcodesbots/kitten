@@ -294,7 +294,7 @@ Slide sequence:
 ${slideInstructions}
 
 Number of slides: ${bucketImages.length}
-For each slide, pick the best image filename from the options and write matching text. Then generate a caption and hashtags.`;
+For each slide, write text according to the instructions and then pick the best image filename from the options. Then generate a caption and hashtags.`;
 
     return { system, user };
   }
