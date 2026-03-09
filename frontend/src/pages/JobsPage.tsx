@@ -9,12 +9,19 @@ import toast from 'react-hot-toast';
 export default function JobsPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showPaused, setShowPaused] = useState(false);
   const navigate = useNavigate();
+
+  const sortJobs = (items: Job[]) =>
+    [...items].sort((a, b) => {
+      if (a.is_active === b.is_active) return 0;
+      return a.is_active ? -1 : 1;
+    });
 
   const loadJobs = async () => {
     try {
       const data = await api.listJobs();
-      setJobs(data);
+      setJobs(sortJobs(data));
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -41,7 +48,7 @@ export default function JobsPage() {
       } else {
         await api.resumeJob(job.id);
       }
-      setJobs(prev => prev.map(j => j.id === job.id ? { ...j, is_active: !j.is_active } : j));
+      setJobs(prev => sortJobs(prev.map(j => j.id === job.id ? { ...j, is_active: !j.is_active } : j)));
       toast.success(job.is_active ? 'Job paused' : 'Job resumed');
     } catch (err: any) {
       toast.error(err.message);
@@ -74,6 +81,46 @@ export default function JobsPage() {
     return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-surface-400" /></div>;
   }
 
+  const activeJobs = jobs.filter(job => job.is_active);
+  const pausedJobs = jobs.filter(job => !job.is_active);
+
+  const renderJobRow = (job: Job) => (
+    <div key={job.id} className="card px-5 py-4 flex items-center gap-4">
+      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/jobs/${job.id}`)}>
+        <div className="flex items-center gap-2">
+          <h3 className="font-medium truncate">{job.name}</h3>
+          <span className={`badge ${job.is_active ? 'bg-green-100 text-green-700' : 'bg-surface-100 text-surface-500'}`}>
+            {job.is_active ? 'Active' : 'Paused'}
+          </span>
+          {job.auto_approved && (
+            <span className="badge bg-indigo-100 text-indigo-700">Auto-approve</span>
+          )}
+        </div>
+        <div className="flex items-center gap-3 mt-1 text-xs text-surface-500">
+          <span>{job.slide_count} slides</span>
+          <span>{(job as any).schedule_type === 'daily' ? 'Daily' : (job as any).schedule_type === 'weekly' ? 'Weekly' : 'Manual'}</span>
+          <span>{(job as any).run_count || 0} runs</span>
+          <span>{formatRelative(job.created_at)}</span>
+       </div>
+      </div>
+
+      <div className="flex items-center gap-1.5">
+        <button onClick={() => handleGenerate(job.id)} className="btn-ghost p-2" title="Generate preview">
+          <Play className="w-4 h-4" />
+        </button>
+        <button onClick={() => handleToggle(job)} className="btn-ghost p-2" title={job.is_active ? 'Pause' : 'Resume'}>
+          <Pause className="w-4 h-4" />
+        </button>
+        <button onClick={() => handleDuplicate(job.id)} className="btn-ghost p-2" title="Duplicate">
+          <Copy className="w-4 h-4" />
+        </button>
+        <button onClick={() => handleDelete(job.id)} className="btn-ghost p-2 text-red-500 hover:bg-red-50" title="Delete">
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+ 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -90,42 +137,24 @@ export default function JobsPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {jobs.map(job => (
-            <div key={job.id} className="card px-5 py-4 flex items-center gap-4">
-              <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/jobs/${job.id}`)}>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-medium truncate">{job.name}</h3>
-                  <span className={`badge ${job.is_active ? 'bg-green-100 text-green-700' : 'bg-surface-100 text-surface-500'}`}>
-                    {job.is_active ? 'Active' : 'Paused'}
-                  </span>
-                  {job.auto_approved && (
-                    <span className="badge bg-indigo-100 text-indigo-700">Auto-approve</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-3 mt-1 text-xs text-surface-500">
-                  <span>{job.slide_count} slides</span>
-                  <span>{(job as any).schedule_type === 'daily' ? 'Daily' : (job as any).schedule_type === 'weekly' ? 'Weekly' : 'Manual'}</span>
-                  <span>{(job as any).run_count || 0} runs</span>
-                  <span>{formatRelative(job.created_at)}</span>
-                </div>
-              </div>
+          {activeJobs.map(renderJobRow)}
 
-              <div className="flex items-center gap-1.5">
-                <button onClick={() => handleGenerate(job.id)} className="btn-ghost p-2" title="Generate preview">
-                  <Play className="w-4 h-4" />
-                </button>
-                <button onClick={() => handleToggle(job)} className="btn-ghost p-2" title={job.is_active ? 'Pause' : 'Resume'}>
-                  <Pause className="w-4 h-4" />
-                </button>
-                <button onClick={() => handleDuplicate(job.id)} className="btn-ghost p-2" title="Duplicate">
-                  <Copy className="w-4 h-4" />
-                </button>
-                <button onClick={() => handleDelete(job.id)} className="btn-ghost p-2 text-red-500 hover:bg-red-50" title="Delete">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
+          {pausedJobs.length > 0 && (
+            <div className="pt-2">
+              <button
+                onClick={() => setShowPaused(prev => !prev)}
+                className="text-sm text-surface-500 hover:text-surface-700 transition-colors"
+              >
+                {showPaused ? 'Hide paused' : `See paused (${pausedJobs.length})`}
+              </button>
             </div>
-          ))}
+          )}
+
+          {showPaused && pausedJobs.length > 0 && (
+            <div className="space-y-3 pt-1">
+              {pausedJobs.map(renderJobRow)}
+            </div>
+          )}
         </div>
       )}
     </div>
