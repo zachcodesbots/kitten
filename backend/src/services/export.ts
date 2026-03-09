@@ -22,6 +22,12 @@ export class ExportService {
       const run = await getOne<Run>('SELECT * FROM runs WHERE id = $1', [task.run_id]);
       if (!run) throw new Error('Run not found');
 
+      const job = await getOne<{ id: string; add_to_drafts: boolean }>(
+        'SELECT id, add_to_drafts FROM jobs WHERE id = $1',
+        [run.job_id]
+      );
+      if (!job) throw new Error('Job not found');
+
       const slides = await getMany<RunSlide & { image_url: string }>(
         `SELECT rs.*, COALESCE(rs.composited_image_url, bi.public_url) as image_url
          FROM run_slides rs
@@ -47,13 +53,14 @@ export class ExportService {
         ? (run.hashtags_json as string[]).map(h => `#${h}`).join(' ')
         : '';
       const caption = [run.caption || '', hashtags].filter(Boolean).join('\n\n').substring(0, 2200);
+      const postMode = job.add_to_drafts ? 'MEDIA_UPLOAD' : 'DIRECT_POST';
 
       const formData = new FormData();
       formData.append('user', profileUsername);
       formData.append('tiktok_title', '');
       formData.append('tiktok_description', 'the app is called "JournAI" btw #gymmotivation #motivation #fyp #fitness #discipline');
       formData.append('platform[]', 'tiktok');
-      formData.append('post_mode', 'MEDIA_UPLOAD');
+      formData.append('post_mode', postMode);
       formData.append('auto_add_music', 'true');
       imageUrls.forEach(url => formData.append('photos[]', url));
 

@@ -28,14 +28,14 @@ router.post('/', async (req: Request, res: Response) => {
   try {
     const {
       name, general_prompt, slide_count, is_active, require_approval,
-      auto_approved, timezone, target_account_id, slides, schedule,
+      auto_approved, add_to_drafts, timezone, target_account_id, slides, schedule,
     } = req.body;
 
     if (!name) return res.status(400).json({ error: 'Job name required' });
 
     const job = await getOne<Job>(
-      `INSERT INTO jobs (name, general_prompt, slide_count, is_active, require_approval, auto_approved, timezone, target_account_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      `INSERT INTO jobs (name, general_prompt, slide_count, is_active, require_approval, auto_approved, add_to_drafts, timezone, target_account_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
       [
         name,
         general_prompt || null,
@@ -43,6 +43,7 @@ router.post('/', async (req: Request, res: Response) => {
         is_active !== false,
         require_approval !== false,
         auto_approved || false,
+        add_to_drafts !== false,
         timezone || 'UTC',
         target_account_id || null,
       ]
@@ -101,7 +102,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
   try {
     const {
       name, general_prompt, slide_count, is_active, require_approval,
-      auto_approved, timezone, target_account_id, slides, schedule,
+      auto_approved, add_to_drafts, timezone, target_account_id, slides, schedule,
     } = req.body;
 
     const fields: string[] = [];
@@ -114,6 +115,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
     if (is_active !== undefined) { fields.push(`is_active = $${idx++}`); values.push(is_active); }
     if (require_approval !== undefined) { fields.push(`require_approval = $${idx++}`); values.push(require_approval); }
     if (auto_approved !== undefined) { fields.push(`auto_approved = $${idx++}`); values.push(auto_approved); }
+    if (add_to_drafts !== undefined) { fields.push(`add_to_drafts = $${idx++}`); values.push(add_to_drafts); }
     if (timezone !== undefined) { fields.push(`timezone = $${idx++}`); values.push(timezone); }
     if (target_account_id !== undefined) { fields.push(`target_account_id = $${idx++}`); values.push(target_account_id || null); }
     
@@ -176,14 +178,15 @@ router.post('/:id/duplicate', async (req: Request, res: Response) => {
     if (!source) return res.status(404).json({ error: 'Job not found' });
 
     const job = await getOne<Job>(
-      `INSERT INTO jobs (name, general_prompt, slide_count, is_active, require_approval, auto_approved, timezone)
-       VALUES ($1, $2, $3, false, $4, $5, $6) RETURNING *`,
+      `INSERT INTO jobs (name, general_prompt, slide_count, is_active, require_approval, auto_approved, add_to_drafts, timezone)
+       VALUES ($1, $2, $3, false, $4, $5, $6, $7) RETURNING *`,
       [
         `${source.name} (copy)`,
         source.general_prompt,
         source.slide_count,
         source.require_approval,
         source.auto_approved,
+        source.add_to_drafts,
         source.timezone,
       ]
     );

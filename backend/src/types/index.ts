@@ -41,6 +41,7 @@ export interface Job {
   auto_approved: boolean;
   timezone: string;
   target_account_id: string | null;
+  add_to_drafts: boolean;
   created_at: string;
   updated_at: string;
   slides?: JobSlide[];
