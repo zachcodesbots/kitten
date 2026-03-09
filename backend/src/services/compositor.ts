@@ -15,19 +15,29 @@ function normalizeText(text: string): string {
 }
 
 function wrapText(text: string, maxCharsPerLine: number): string[] {
-  const words = text.split(' ');
+  const paragraphs = text.split(/\r?\n/);
   const lines: string[] = [];
-  let current = '';
 
-  for (const word of words) {
-    if ((current + ' ' + word).trim().length > maxCharsPerLine) {
-      if (current) lines.push(current.trim());
-      current = word;
-    } else {
-      current = (current + ' ' + word).trim();
+  for (const paragraph of paragraphs) {
+    const words = paragraph.split(/\s+/).filter(Boolean);
+    let current = '';
+
+    for (const word of words) {
+      if ((current + ' ' + word).trim().length > maxCharsPerLine) {
+        if (current) lines.push(current.trim());
+        current = word;
+      } else {
+        current = (current + ' ' + word).trim();
+      }
+    }
+
+    if (current) {
+      lines.push(current.trim());
+    } else if (paragraph.trim() === '') {
+      lines.push('');
     }
   }
-  if (current) lines.push(current.trim());
+
   return lines;
 }
 
