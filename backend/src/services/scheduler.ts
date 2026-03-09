@@ -114,8 +114,9 @@ export class SchedulerService {
         : schedule.run_times_json;
 
       if (Array.isArray(times) && times.length > 0) {
+        const sortedTimes = [...times].sort();
         // Find next time today or tomorrow
-        for (const time of [...times].sort()) {
+        for (const time of sortedTimes) {
           const [hours, minutes] = time.split(':').map(Number);
           const candidate = this.makeDateInTimeZone(
             nowParts.year,
@@ -128,7 +129,7 @@ export class SchedulerService {
           if (candidate > now) return candidate.toISOString();
         }
         // All times passed today, schedule for tomorrow's first time
-        const [hours, minutes] = times[0].split(':').map(Number);
+        const [hours, minutes] = sortedTimes[0].split(':').map(Number);
         const tomorrow = this.addDaysToYmd(nowParts.year, nowParts.month, nowParts.day, 1);
         return this.makeDateInTimeZone(
           tomorrow.year,
