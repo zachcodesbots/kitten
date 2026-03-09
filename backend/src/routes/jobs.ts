@@ -28,7 +28,7 @@ router.post('/', async (req: Request, res: Response) => {
   try {
     const {
       name, general_prompt, slide_count, is_active, require_approval,
-      auto_approved, add_to_drafts, timezone, target_account_id, slides, schedule,
+      add_to_drafts, timezone, target_account_id, slides, schedule,
     } = req.body;
 
     if (!name) return res.status(400).json({ error: 'Job name required' });
@@ -42,7 +42,7 @@ router.post('/', async (req: Request, res: Response) => {
         slide_count || 6,
         is_active !== false,
         require_approval !== false,
-        auto_approved || false,
+        require_approval === false,
         add_to_drafts !== false,
         timezone || 'UTC',
         target_account_id || null,
@@ -102,7 +102,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
   try {
     const {
       name, general_prompt, slide_count, is_active, require_approval,
-      auto_approved, add_to_drafts, timezone, target_account_id, slides, schedule,
+      add_to_drafts, timezone, target_account_id, slides, schedule,
     } = req.body;
 
     const fields: string[] = [];
@@ -113,8 +113,12 @@ router.patch('/:id', async (req: Request, res: Response) => {
     if (general_prompt !== undefined) { fields.push(`general_prompt = $${idx++}`); values.push(general_prompt); }
     if (slide_count !== undefined) { fields.push(`slide_count = $${idx++}`); values.push(slide_count); }
     if (is_active !== undefined) { fields.push(`is_active = $${idx++}`); values.push(is_active); }
-    if (require_approval !== undefined) { fields.push(`require_approval = $${idx++}`); values.push(require_approval); }
-    if (auto_approved !== undefined) { fields.push(`auto_approved = $${idx++}`); values.push(auto_approved); }
+    if (require_approval !== undefined) {
+      fields.push(`require_approval = $${idx++}`);
+      values.push(require_approval);
+      fields.push(`auto_approved = $${idx++}`);
+      values.push(!require_approval);
+    }
     if (add_to_drafts !== undefined) { fields.push(`add_to_drafts = $${idx++}`); values.push(add_to_drafts); }
     if (timezone !== undefined) { fields.push(`timezone = $${idx++}`); values.push(timezone); }
     if (target_account_id !== undefined) { fields.push(`target_account_id = $${idx++}`); values.push(target_account_id || null); }
@@ -185,7 +189,7 @@ router.post('/:id/duplicate', async (req: Request, res: Response) => {
         source.general_prompt,
         source.slide_count,
         source.require_approval,
-        source.auto_approved,
+        !source.require_approval,
         source.add_to_drafts,
         source.timezone,
       ]
