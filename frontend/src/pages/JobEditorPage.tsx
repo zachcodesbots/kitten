@@ -28,6 +28,7 @@ export default function JobEditorPage() {
   const [autoApproved, setAutoApproved] = useState(false);
   const [timezone, setTimezone] = useState('UTC');
   const [targetAccountId, setTargetAccountId] = useState<string>('');
+  const [addToDrafts, setAddToDrafts] = useState(true);
   const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
 
   // Slides
@@ -58,6 +59,7 @@ export default function JobEditorPage() {
       setGeneralPrompt(job.general_prompt || '');
       setIsActive(job.is_active);
       setRequireApproval(job.require_approval);
+      setAddToDrafts(job.add_to_drafts ?? true);
       setAutoApproved(job.auto_approved);
       setTimezone(job.timezone);
       setTargetAccountId(job.target_account_id || '');
@@ -94,6 +96,7 @@ export default function JobEditorPage() {
         is_active: isActive,
         require_approval: requireApproval,
         auto_approved: autoApproved,
+        add_to_drafts: addToDrafts,
         timezone,
         target_account_id: targetAccountId || null,
         slides: slides.map((s, i) => ({
@@ -214,6 +217,20 @@ export default function JobEditorPage() {
             <label className="flex items-center gap-3 cursor-pointer">
               <input type="checkbox" checked={autoApproved} onChange={e => setAutoApproved(e.target.checked)} className="rounded border-surface-300" />
               <span className="text-sm">Auto-approve scheduled runs</span>
+            </label>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={addToDrafts}
+                onChange={e => setAddToDrafts(e.target.checked)}
+                className="rounded border-surface-300 mt-0.5"
+              />
+              <div>
+                <span className="text-sm block">Add to drafts</span>
+                <p className="text-xs text-surface-400 mt-1">
+                  When enabled, exports use TikTok drafts/inbox flow so you can finish editing in-app. When disabled, posts publish immediately.
+                </p>
+              </div>
             </label>
             <div className="pt-1">
               <label className="label">Post to TikTok Account</label>
