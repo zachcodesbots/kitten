@@ -4,6 +4,131 @@ import { requireAuth } from '../middleware/auth';
 import { Job, JobSlide, JobSchedule } from '../types';
 import { GenerationService } from '../services/generation';
 
+function getTimeZoneParts(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+
+  const map = Object.fromEntries(parts.map(p => [p.type, p.value]));
+  return {
+    year: Number(map.year),
+    month: Number(map.month),
+    day: Number(map.day),
+    hour: Number(map.hour),
+    minute: Number(map.minute),
+    second: Number(map.second),
+  };
+}
+
+function getTimeZoneOffsetMs(date: Date, timeZone: string) {
+  const tz = getTimeZoneParts(date, timeZone);
+  const asUtc = Date.UTC(tz.year, tz.month - 1, tz.day, tz.hour, tz.minute, tz.second);
+  return asUtc - date.getTime();
+}
+
+function makeDateInTimeZone(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  timeZone: string
+) {
+  const approxUtc = new Date(Date.UTC(year, month - 1, day, hour, minute, 0));
+  const offset = getTimeZoneOffsetMs(approxUtc, timeZone);
+  return new Date(approxUtc.getTime() - offset);
+}
+
+function addDaysToYmd(year: number, month: number, day: number, days: number) {
+  const d = new Date(Date.UTC(year, month - 1, day + days));
+  return {
+    year: d.getUTCFullYear(),
+    month: d.getUTCMonth() + 1,
+    day: d.getUTCDate(),
+  };
+}
+
+function computeInitialNextRun(schedule: {
+  schedule_type?: 'manual' | 'daily' | 'weekly' | 'custom';
+  run_times_json?: string[] | null;
+  active_days?: number[] | null;
+  timezone?: string | null;
+}): string | null {
+  const timeZone = schedule.timezone || 'UTC';
+  const now = new Date();
+  const nowParts = getTimeZoneParts(now, timeZone);
+
+  if (schedule.schedule_type === 'daily' && Array.isArray(schedule.run_times_json) && schedule.run_times_json.length > 0) {
+    const times = [...schedule.run_times_json].sort();
+
+    for (const time of times) {
+      const [hours, minutes] = time.split(':').map(Number);
+      const candidate = makeDateInTimeZone(
+        nowParts.year,
+        nowParts.month,
+        nowParts.day,
+        hours,
+        minutes,
+        timeZone
+      );
+      if (candidate > now) return candidate.toISOString();
+    }
+
+    const first = times[0];
+    const [hours, minutes] = first.split(':').map(Number);
+    const tomorrow = addDaysToYmd(nowParts.year, nowParts.month, nowParts.day, 1);
+    return makeDateInTimeZone(
+      tomorrow.year,
+      tomorrow.month,
+      tomorrow.day,
+      hours,
+      minutes,
+      timeZone
+    ).toISOString();
+  }
+
+  if (
+    schedule.schedule_type === 'weekly' &&
+    Array.isArray(schedule.active_days) &&
+    schedule.active_days.length > 0 &&
+    Array.isArray(schedule.run_times_json) &&
+    schedule.run_times_json.length > 0
+  ) {
+    const days = [...schedule.active_days].sort();
+    const times = [...schedule.run_times_json].sort();
+
+    for (let dayOffset = 0; dayOffset <= 7; dayOffset++) {
+      const ymd = addDaysToYmd(nowParts.year, nowParts.month, nowParts.day, dayOffset);
+      const probe = makeDateInTimeZone(ymd.year, ymd.month, ymd.day, 12, 0, timeZone);
+      const dayOfWeek = probe.getUTCDay();
+
+      if (!days.includes(dayOfWeek)) continue;
+
+      for (const time of times) {
+        const [hours, minutes] = time.split(':').map(Number);
+        const candidate = makeDateInTimeZone(
+          ymd.year,
+          ymd.month,
+          ymd.day,
+          hours,
+          minutes,
+          timeZone
+        );
+        if (candidate > now) return candidate.toISOString();
+      }
+    }
+  }
+
+  return null;
+}
+
 const router = Router();
 router.use(requireAuth);
 
@@ -72,7 +197,12 @@ router.post('/', async (req: Request, res: Response) => {
           schedule.cron_expression || null,
           schedule.run_times_json ? JSON.stringify(schedule.run_times_json) : null,
           schedule.active_days ? JSON.stringify(schedule.active_days) : null,
-          schedule.next_run_at || null,
+          computeInitialNextRun({
+            schedule_type: schedule.schedule_type || 'manual',
+            run_times_json: schedule.run_times_json || null,
+            active_days: schedule.active_days || null,
+            timezone: timezone || 'UTC',
+          }),
         ]
       );
     }
@@ -151,7 +281,12 @@ router.patch('/:id', async (req: Request, res: Response) => {
           schedule.cron_expression || null,
           schedule.run_times_json ? JSON.stringify(schedule.run_times_json) : null,
           schedule.active_days ? JSON.stringify(schedule.active_days) : null,
-          schedule.next_run_at || null,
+          computeInitialNextRun({
+            schedule_type: schedule.schedule_type || 'manual',
+            run_times_json: schedule.run_times_json || null,
+            active_days: schedule.active_days || null,
+            timezone: timezone || 'UTC',
+          }),
         ]
       );
     }

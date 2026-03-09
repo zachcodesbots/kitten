@@ -5,10 +5,61 @@ import { GenerationService } from './generation';
 export class SchedulerService {
   private genService = new GenerationService();
 
+  private getTimeZoneParts(date: Date, timeZone: string) {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(date);
+
+    const map = Object.fromEntries(parts.map(p => [p.type, p.value]));
+    return {
+      year: Number(map.year),
+      month: Number(map.month),
+      day: Number(map.day),
+      hour: Number(map.hour),
+      minute: Number(map.minute),
+      second: Number(map.second),
+    };
+  }
+
+  private getTimeZoneOffsetMs(date: Date, timeZone: string) {
+    const tz = this.getTimeZoneParts(date, timeZone);
+    const asUtc = Date.UTC(tz.year, tz.month - 1, tz.day, tz.hour, tz.minute, tz.second);
+    return asUtc - date.getTime();
+  }
+
+  private makeDateInTimeZone(
+    year: number,
+    month: number,
+    day: number,
+    hour: number,
+    minute: number,
+    timeZone: string
+  ) {
+    const approxUtc = new Date(Date.UTC(year, month - 1, day, hour, minute, 0));
+    const offset = this.getTimeZoneOffsetMs(approxUtc, timeZone);
+    return new Date(approxUtc.getTime() - offset);
+  }
+
+  private addDaysToYmd(year: number, month: number, day: number, days: number) {
+    const d = new Date(Date.UTC(year, month - 1, day + days));
+    return {
+      year: d.getUTCFullYear(),
+      month: d.getUTCMonth() + 1,
+      day: d.getUTCDate(),
+    };
+  }
+
   async checkAndRunDueJobs(): Promise<void> {
     try {
-      const dueSchedules = await getMany<JobSchedule & { job_is_active: boolean }>(
-        `SELECT js.*, j.is_active as job_is_active
+      const dueSchedules = await getMany<JobSchedule & { job_is_active: boolean; timezone: string | null }>(
+        `SELECT js.*, j.is_active as job_is_active, j.timezone
          FROM job_schedules js
          JOIN jobs j ON j.id = js.job_id
          WHERE js.schedule_type != 'manual'
@@ -52,8 +103,10 @@ export class SchedulerService {
     }
   }
 
-  private computeNextRun(schedule: JobSchedule): string | null {
+  private computeNextRun(schedule: JobSchedule & { timezone?: string | null }): string | null {
     const now = new Date();
+    const timeZone = schedule.timezone || 'UTC';
+    const nowParts = this.getTimeZoneParts(now, timeZone);
 
     if (schedule.schedule_type === 'daily' && schedule.run_times_json) {
       const times = typeof schedule.run_times_json === 'string'
@@ -62,18 +115,29 @@ export class SchedulerService {
 
       if (Array.isArray(times) && times.length > 0) {
         // Find next time today or tomorrow
-        for (const time of times.sort()) {
+        for (const time of [...times].sort()) {
           const [hours, minutes] = time.split(':').map(Number);
-          const candidate = new Date(now);
-          candidate.setHours(hours, minutes, 0, 0);
+          const candidate = this.makeDateInTimeZone(
+            nowParts.year,
+            nowParts.month,
+            nowParts.day,
+            hours,
+            minutes,
+            timeZone
+          );
           if (candidate > now) return candidate.toISOString();
         }
         // All times passed today, schedule for tomorrow's first time
         const [hours, minutes] = times[0].split(':').map(Number);
-        const tomorrow = new Date(now);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        tomorrow.setHours(hours, minutes, 0, 0);
-        return tomorrow.toISOString();
+        const tomorrow = this.addDaysToYmd(nowParts.year, nowParts.month, nowParts.day, 1);
+        return this.makeDateInTimeZone(
+          tomorrow.year,
+          tomorrow.month,
+          tomorrow.day,
+          hours,
+          minutes,
+          timeZone
+        ).toISOString();
       }
     }
 
@@ -88,14 +152,21 @@ export class SchedulerService {
       if (Array.isArray(days) && Array.isArray(times) && days.length > 0 && times.length > 0) {
         // Find next valid day/time combo within next 7 days
         for (let dayOffset = 0; dayOffset <= 7; dayOffset++) {
-          const candidate = new Date(now);
-          candidate.setDate(candidate.getDate() + dayOffset);
-          const dayOfWeek = candidate.getDay();
+          const ymd = this.addDaysToYmd(nowParts.year, nowParts.month, nowParts.day, dayOffset);
+          const probe = this.makeDateInTimeZone(ymd.year, ymd.month, ymd.day, 12, 0, timeZone);
+          const dayOfWeek = probe.getUTCDay();
 
           if (days.includes(dayOfWeek)) {
-            for (const time of times.sort()) {
+            for (const time of [...times].sort()) {
               const [hours, minutes] = time.split(':').map(Number);
-              candidate.setHours(hours, minutes, 0, 0);
+              const candidate = this.makeDateInTimeZone(
+                ymd.year,
+                ymd.month,
+                ymd.day,
+                hours,
+                minutes,
+                timeZone
+              );
               if (candidate > now) return candidate.toISOString();
             }
           }
