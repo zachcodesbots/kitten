@@ -25,7 +25,6 @@ export default function JobEditorPage() {
   const [generalPrompt, setGeneralPrompt] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [requireApproval, setRequireApproval] = useState(true);
-  const [autoApproved, setAutoApproved] = useState(false);
   const [timezone, setTimezone] = useState('UTC');
   const [targetAccountId, setTargetAccountId] = useState<string>('');
   const [addToDrafts, setAddToDrafts] = useState(true);
@@ -60,7 +59,6 @@ export default function JobEditorPage() {
       setIsActive(job.is_active);
       setRequireApproval(job.require_approval);
       setAddToDrafts(job.add_to_drafts ?? true);
-      setAutoApproved(job.auto_approved);
       setTimezone(job.timezone);
       setTargetAccountId(job.target_account_id || '');
 
@@ -95,7 +93,7 @@ export default function JobEditorPage() {
         slide_count: slides.length,
         is_active: isActive,
         require_approval: requireApproval,
-        auto_approved: autoApproved,
+        auto_approved: !requireApproval,
         add_to_drafts: addToDrafts,
         timezone,
         target_account_id: targetAccountId || null,
@@ -213,10 +211,6 @@ export default function JobEditorPage() {
             <label className="flex items-center gap-3 cursor-pointer">
               <input type="checkbox" checked={requireApproval} onChange={e => setRequireApproval(e.target.checked)} className="rounded border-surface-300" />
               <span className="text-sm">Require manual approval</span>
-            </label>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" checked={autoApproved} onChange={e => setAutoApproved(e.target.checked)} className="rounded border-surface-300" />
-              <span className="text-sm">Auto-approve scheduled runs</span>
             </label>
             <label className="flex items-start gap-3 cursor-pointer">
               <input
