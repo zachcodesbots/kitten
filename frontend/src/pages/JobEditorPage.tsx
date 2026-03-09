@@ -9,6 +9,7 @@ interface SlideRow {
   position: number;
   bucket_id: string;
   prompt_override: string;
+  text_vertical_position: string;
 }
 
 export default function JobEditorPage() {
@@ -32,12 +33,12 @@ export default function JobEditorPage() {
 
   // Slides
   const [slides, setSlides] = useState<SlideRow[]>([
-    { position: 1, bucket_id: '', prompt_override: '' },
-    { position: 2, bucket_id: '', prompt_override: '' },
-    { position: 3, bucket_id: '', prompt_override: '' },
-    { position: 4, bucket_id: '', prompt_override: '' },
-    { position: 5, bucket_id: '', prompt_override: '' },
-    { position: 6, bucket_id: '', prompt_override: '' },
+    { position: 1, bucket_id: '', prompt_override: '', text_vertical_position: '' },
+    { position: 2, bucket_id: '', prompt_override: '', text_vertical_position: '' },
+    { position: 3, bucket_id: '', prompt_override: '', text_vertical_position: '' },
+    { position: 4, bucket_id: '', prompt_override: '', text_vertical_position: '' },
+    { position: 5, bucket_id: '', prompt_override: '', text_vertical_position: '' },
+    { position: 6, bucket_id: '', prompt_override: '', text_vertical_position: '' },
   ]);
 
   // Schedule
@@ -67,6 +68,7 @@ export default function JobEditorPage() {
           position: s.position,
           bucket_id: s.bucket_id,
           prompt_override: s.prompt_override || '',
+          text_vertical_position: s.text_vertical_position == null ? '' : String(s.text_vertical_position),
         })));
       }
 
@@ -101,6 +103,10 @@ export default function JobEditorPage() {
           position: i + 1,
           bucket_id: s.bucket_id,
           prompt_override: s.prompt_override || null,
+          text_vertical_position:
+            s.text_vertical_position === ''
+              ? null
+              : Math.max(0, Math.min(100, Number(s.text_vertical_position))),
         })),
         schedule: {
           schedule_type: scheduleType,
@@ -137,7 +143,7 @@ export default function JobEditorPage() {
   };
 
   const addSlide = () => {
-    setSlides(prev => [...prev, { position: prev.length + 1, bucket_id: '', prompt_override: '' }]);
+    setSlides(prev => [...prev, { position: prev.length + 1, bucket_id: '', prompt_override: '', text_vertical_position: '' }]);
   };
 
   const removeSlide = (idx: number) => {
@@ -280,6 +286,18 @@ export default function JobEditorPage() {
                     onChange={e => updateSlide(idx, 'prompt_override', e.target.value)}
                     placeholder="Slide-specific prompt override (optional)"
                   />
+                  <div>
+                    <label className="label text-xs">Text position (0 bottom, 100 top)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      className="input text-xs py-1.5"
+                      value={slide.text_vertical_position}
+                      onChange={e => updateSlide(idx, 'text_vertical_position', e.target.value)}
+                      placeholder="Leave blank for default"
+                    />
+                  </div>
                 </div>
               ))}
             </div>
