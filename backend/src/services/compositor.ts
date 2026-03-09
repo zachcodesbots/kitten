@@ -4,6 +4,16 @@ import { uploadBuffer, getPublicUrl } from '../utils/storage';
 
 const PADDING = 40;
 
+function normalizeText(text: string): string {
+  return text
+    .replace(/\r\n/g, '\n')
+    .replace(/\u00A0/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/ ?\n ?/g, '\n')
+    .replace(/(\d+)\.(\S)/g, '$1. $2')
+    .trim();
+}
+
 function wrapText(text: string, maxCharsPerLine: number): string[] {
   const words = text.split(' ');
   const lines: string[] = [];
@@ -30,12 +40,17 @@ function escapeXml(str: string): string {
     .replace(/'/g, '&apos;');
 }
 
+function escapeTextForSvg(str: string): string {
+  return escapeXml(str).replace(/ /g, '&#160;');
+}
+
 export async function compositeTextOnImage(
   imageBuffer: Buffer,
   text: string,
   isFirst: boolean = false,
   textVerticalPosition?: number | null
 ): Promise<Buffer> {
+  text = normalizeText(text);
   const img = sharp(imageBuffer);
   const meta = await img.metadata();
   const width = meta.width;
@@ -71,7 +86,7 @@ export async function compositeTextOnImage(
           stroke="black"
           stroke-width="${Math.round(FONT_SIZE * 0.18)}"
           stroke-linejoin="round"
-        >${escapeXml(line)}</text>
+        >${escapeTextForSvg(line)}</text>
       `).join('')}
     </svg>`;
 
