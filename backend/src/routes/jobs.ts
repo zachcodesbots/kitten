@@ -180,8 +180,15 @@ router.post('/', async (req: Request, res: Response) => {
     if (Array.isArray(slides)) {
       for (const slide of slides) {
         await query(
-          `INSERT INTO job_slides (job_id, position, bucket_id, prompt_override) VALUES ($1, $2, $3, $4)`,
-          [job.id, slide.position, slide.bucket_id, slide.prompt_override || null]
+          `INSERT INTO job_slides (job_id, position, bucket_id, prompt_override, text_vertical_position)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [
+            job.id,
+            slide.position,
+            slide.bucket_id,
+            slide.prompt_override || null,
+            slide.text_vertical_position ?? null,
+          ]
         );
       }
     }
@@ -263,8 +270,15 @@ router.patch('/:id', async (req: Request, res: Response) => {
       await query('DELETE FROM job_slides WHERE job_id = $1', [req.params.id]);
       for (const slide of slides) {
         await query(
-          `INSERT INTO job_slides (job_id, position, bucket_id, prompt_override) VALUES ($1, $2, $3, $4)`,
-          [req.params.id, slide.position, slide.bucket_id, slide.prompt_override || null]
+          `INSERT INTO job_slides (job_id, position, bucket_id, prompt_override, text_vertical_position)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [
+            req.params.id,
+            slide.position,
+            slide.bucket_id,
+            slide.prompt_override || null,
+            slide.text_vertical_position ?? null,
+          ]
         );
       }
     }
@@ -335,8 +349,9 @@ router.post('/:id/duplicate', async (req: Request, res: Response) => {
     if (source.slides) {
       for (const slide of source.slides) {
         await query(
-          `INSERT INTO job_slides (job_id, position, bucket_id, prompt_override) VALUES ($1, $2, $3, $4)`,
-          [job.id, slide.position, slide.bucket_id, slide.prompt_override]
+          `INSERT INTO job_slides (job_id, position, bucket_id, prompt_override, text_vertical_position)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [job.id, slide.position, slide.bucket_id, slide.prompt_override, slide.text_vertical_position ?? null]
         );
       }
     }

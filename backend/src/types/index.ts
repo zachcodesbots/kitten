@@ -54,6 +54,7 @@ export interface JobSlide {
   position: number;
   bucket_id: string;
   prompt_override: string | null;
+  text_vertical_position: number | null;
   created_at: string;
   updated_at: string;
   bucket_name?: string;
@@ -107,6 +108,7 @@ export interface RunSlide {
   bucket_id: string | null;
   selected_image_id: string | null;
   generated_text: string | null;
+  text_vertical_position: number | null;
   image_locked: boolean;
   created_at: string;
   updated_at: string;

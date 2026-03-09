@@ -33,7 +33,8 @@ function escapeXml(str: string): string {
 export async function compositeTextOnImage(
   imageBuffer: Buffer,
   text: string,
-  isFirst: boolean = false
+  isFirst: boolean = false,
+  textVerticalPosition?: number | null
 ): Promise<Buffer> {
   const img = sharp(imageBuffer);
   const meta = await img.metadata();
@@ -45,9 +46,16 @@ export async function compositeTextOnImage(
   const lines = wrapText(text, maxChars);
   const lineHeight = FONT_SIZE * 1.3;
   const blockHeight = lines.length * lineHeight + PADDING * 2;
-  const blockY = !isFirst 
-    ? height - blockHeight - height * 0.32
-    : height - blockHeight - height * 0.62;
+  const blockY =
+    textVerticalPosition == null
+      ? (!isFirst
+          ? height - blockHeight - height * 0.32
+          : height - blockHeight - height * 0.62)
+      : (() => {
+          const clamped = Math.max(0, Math.min(100, textVerticalPosition));
+          const maxBlockY = Math.max(0, height - blockHeight);
+          return maxBlockY * (1 - clamped / 100);
+        })();
   const textSvg = `
     <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
       ${lines.map((line, i) => `
@@ -82,10 +90,11 @@ export async function fetchImageBuffer(url: string): Promise<Buffer> {
 export async function compositeAndUpload(
   imageUrl: string,
   text: string,
-  isFirst: boolean = false
+  isFirst: boolean = false,
+  textVerticalPosition?: number | null
 ): Promise<string> {
   const original = await fetchImageBuffer(imageUrl);
-  const composited = await compositeTextOnImage(original, text, isFirst);
+  const composited = await compositeTextOnImage(original, text, isFirst, textVerticalPosition);
   const key = `composited/${uuidv4()}.jpg`;
   await uploadBuffer(composited, key, 'image/jpeg');
   return getPublicUrl(key);

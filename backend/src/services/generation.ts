@@ -90,16 +90,31 @@ export class GenerationService {
         if (image.public_url && generatedText) {
           try {
             const isCTA = (slide.bucket_name || '').toLowerCase().includes('cta');
-            compositedUrl = await compositeAndUpload(image.public_url, generatedText, isCTA);
+            compositedUrl = await compositeAndUpload(
+              image.public_url,
+              generatedText,
+              isCTA,
+              slide.text_vertical_position ?? null
+            );
           } catch (e) {
             console.error(`Compositing failed for slide ${i + 1}:`, e);
           }
         }
 
         await query(
-          `INSERT INTO run_slides (run_id, position, bucket_id, selected_image_id, generated_text, composited_image_url)
-          VALUES ($1, $2, $3, $4, $5, $6)`,
-          [run.id, slide.position, slide.bucket_id, image.id, generatedText, compositedUrl]
+          `INSERT INTO run_slides (
+            run_id, position, bucket_id, selected_image_id, generated_text, composited_image_url, text_vertical_position
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [
+            run.id,
+            slide.position,
+            slide.bucket_id,
+            image.id,
+            generatedText,
+            compositedUrl,
+            slide.text_vertical_position ?? null,
+          ]
         );
       }
 
@@ -203,7 +218,12 @@ export class GenerationService {
       if (slides[i].image_url && text) {
         try {
           const isCTA = (slides[i].bucket_name || '').toLowerCase().includes('cta');
-          compositedUrl = await compositeAndUpload(slides[i].image_url!, text, isCTA);
+          compositedUrl = await compositeAndUpload(
+            slides[i].image_url!,
+            text,
+            isCTA,
+            slides[i].text_vertical_position ?? null
+          );
         } catch (e) {
           console.error(`Compositing failed for slide ${i + 1}:`, e);
         }
