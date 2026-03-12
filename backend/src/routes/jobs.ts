@@ -152,18 +152,19 @@ router.get('/', async (_req: Request, res: Response) => {
 router.post('/', async (req: Request, res: Response) => {
   try {
     const {
-      name, general_prompt, slide_count, is_active, require_approval,
+      name, general_prompt, hashtags_json, slide_count, is_active, require_approval,
       add_to_drafts, timezone, target_account_id, slides, schedule,
     } = req.body;
 
     if (!name) return res.status(400).json({ error: 'Job name required' });
 
     const job = await getOne<Job>(
-      `INSERT INTO jobs (name, general_prompt, slide_count, is_active, require_approval, auto_approved, add_to_drafts, timezone, target_account_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      `INSERT INTO jobs (name, general_prompt, hashtags_json, slide_count, is_active, require_approval, auto_approved, add_to_drafts, timezone, target_account_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
       [
         name,
         general_prompt || null,
+        JSON.stringify(Array.isArray(hashtags_json) ? hashtags_json : []),
         slide_count || 6,
         is_active !== false,
         require_approval !== false,
@@ -238,7 +239,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 router.patch('/:id', async (req: Request, res: Response) => {
   try {
     const {
-      name, general_prompt, slide_count, is_active, require_approval,
+      name, general_prompt, hashtags_json, slide_count, is_active, require_approval,
       add_to_drafts, timezone, target_account_id, slides, schedule,
     } = req.body;
 
@@ -248,6 +249,10 @@ router.patch('/:id', async (req: Request, res: Response) => {
 
     if (name !== undefined) { fields.push(`name = $${idx++}`); values.push(name); }
     if (general_prompt !== undefined) { fields.push(`general_prompt = $${idx++}`); values.push(general_prompt); }
+    if (hashtags_json !== undefined) {
+      fields.push(`hashtags_json = $${idx++}`);
+      values.push(JSON.stringify(Array.isArray(hashtags_json) ? hashtags_json : []));
+    }
     if (slide_count !== undefined) { fields.push(`slide_count = $${idx++}`); values.push(slide_count); }
     if (is_active !== undefined) { fields.push(`is_active = $${idx++}`); values.push(is_active); }
     if (require_approval !== undefined) {
@@ -331,16 +336,21 @@ router.post('/:id/duplicate', async (req: Request, res: Response) => {
     if (!source) return res.status(404).json({ error: 'Job not found' });
 
     const job = await getOne<Job>(
-      `INSERT INTO jobs (name, general_prompt, slide_count, is_active, require_approval, auto_approved, add_to_drafts, timezone)
-       VALUES ($1, $2, $3, false, $4, $5, $6, $7) RETURNING *`,
+      `INSERT INTO jobs (
+        name, general_prompt, hashtags_json, slide_count, is_active,
+        require_approval, auto_approved, add_to_drafts, timezone, target_account_id
+      )
+      VALUES ($1, $2, $3, $4, false, $5, $6, $7, $8, $9) RETURNING *`,
       [
         `${source.name} (copy)`,
         source.general_prompt,
+        JSON.stringify(Array.isArray(source.hashtags_json) ? source.hashtags_json : []),
         source.slide_count,
         source.require_approval,
         !source.require_approval,
         source.add_to_drafts,
         source.timezone,
+        source.target_account_id || null,
       ]
     );
 

@@ -58,7 +58,8 @@ export class ExportService {
       const formData = new FormData();
       formData.append('user', profileUsername);
       formData.append('tiktok_title', '');
-      formData.append('tiktok_description', 'the app is called "JournAI" btw #gymmotivation #motivation #fyp #fitness #discipline');
+      formData.append('tiktok_description', caption);
+      formData.append('tiktok_description', ' #gymmotivation #motivation #fyp #fitness #discipline');
       formData.append('platform[]', 'tiktok');
       formData.append('post_mode', postMode);
       formData.append('auto_add_music', 'true');

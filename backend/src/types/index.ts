@@ -35,6 +35,7 @@ export interface Job {
   id: string;
   name: string;
   general_prompt: string | null;
+  hashtags_json: string[] | null;
   slide_count: number;
   is_active: boolean;
   require_approval: boolean;

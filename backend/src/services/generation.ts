@@ -69,8 +69,8 @@ export class GenerationService {
         [
           JSON.stringify(promptPayload),
           generated.post_title || null,
-          generated.caption || null,
-          generated.hashtags ? JSON.stringify(generated.hashtags) : null,
+          'the app is called "JournAI" btw',
+          JSON.stringify(job.hashtags_json || []),
           run.id,
         ]
       );
@@ -127,9 +127,14 @@ export class GenerationService {
 
       // If auto-approved, queue export
       if (finalStatus === 'approved') {
-        const account = await getOne(
-          `SELECT id FROM connected_accounts WHERE provider = 'tiktok' AND is_active = true LIMIT 1`
-        );
+        const account = job.target_account_id
+          ? await getOne(
+              `SELECT id FROM connected_accounts WHERE id = $1 AND provider = 'tiktok' AND is_active = true`,
+              [job.target_account_id]
+            )
+          : await getOne(
+              `SELECT id FROM connected_accounts WHERE provider = 'tiktok' AND is_active = true LIMIT 1`
+            );
         if (account) {
           await query(
             `INSERT INTO export_tasks (run_id, account_id, status) VALUES ($1, $2, 'queued')`,
@@ -241,8 +246,8 @@ export class GenerationService {
       [
         JSON.stringify(promptPayload),
         generated.post_title || run.post_title,
-        generated.caption || run.caption,
-        generated.hashtags ? JSON.stringify(generated.hashtags) : run.hashtags_json,
+        'the app is called "JournAI" btw',
+        JSON.stringify(job.hashtags_json || []),
         run.id,
       ]
     );
@@ -302,8 +307,6 @@ Always respond with valid JSON in this exact format:
   "slide_2_image": "chosen_filename.jpg",
   "slide_2_text": "Text for slide 2",
   ... (one image+text pair per slide)
-  "caption": "A TikTok caption for the post",
-  "hashtags": ["relevant", "hashtags", "here"]
 }
 
 Important: The slide_X_image value must be an exact filename from the provided options for that slide.`;
@@ -314,7 +317,7 @@ Slide sequence:
 ${slideInstructions}
 
 Number of slides: ${bucketImages.length}
-For each slide, write text according to the instructions and then pick the best image filename from the options. Then generate a caption and hashtags.`;
+For each slide, write text according to the instructions and then pick the best image filename from the options.`;
 
     return { system, user };
   }
