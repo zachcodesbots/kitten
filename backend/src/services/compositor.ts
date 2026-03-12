@@ -65,7 +65,7 @@ export async function compositeTextOnImage(
   const meta = await img.metadata();
   const width = meta.width;
   const height = meta.height;
-  const textWidth = width;
+  const textWidth = width * 0.9;
   const FONT_SIZE = Math.round(width * 0.06);
   const maxChars = Math.floor((textWidth - PADDING * 2) / (FONT_SIZE * 0.55));
   const lines = wrapText(text, maxChars);
