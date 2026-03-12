@@ -24,6 +24,8 @@ export default function JobEditorPage() {
   // Job fields
   const [name, setName] = useState('');
   const [generalPrompt, setGeneralPrompt] = useState('');
+  const [hashtags, setHashtags] = useState<string[]>([]);
+  const [hashtagInput, setHashtagInput] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [requireApproval, setRequireApproval] = useState(true);
   const [timezone, setTimezone] = useState('UTC');
@@ -57,6 +59,13 @@ export default function JobEditorPage() {
     api.getJob(id).then(job => {
       setName(job.name);
       setGeneralPrompt(job.general_prompt || '');
+      setHashtags(
+        Array.isArray(job.hashtags_json)
+          ? job.hashtags_json
+          : typeof job.hashtags_json === 'string'
+            ? JSON.parse(job.hashtags_json)
+            : []
+      );
       setIsActive(job.is_active);
       setRequireApproval(job.require_approval);
       setAddToDrafts(job.add_to_drafts ?? true);
@@ -81,17 +90,54 @@ export default function JobEditorPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
+  const normalizeHashtag = (value: string) =>
+    value.trim().replace(/^#+/, '').replace(/\s+/g, '');
+
+  const addHashtag = (raw: string) => {
+    const tag = normalizeHashtag(raw);
+    if (!tag) return;
+    if (hashtags.some(h => h.toLowerCase() === tag.toLowerCase())) return;
+    setHashtags(prev => [...prev, tag]);
+  };
+
+  const removeHashtag = (tag: string) => {
+    setHashtags(prev => prev.filter(h => h !== tag));
+  };
+
+  const commitHashtagInput = () => {
+    if (!hashtagInput.trim()) return;
+    hashtagInput
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
+      .forEach(addHashtag);
+    setHashtagInput('');
+  };
+
   const handleSave = async () => {
     if (!name.trim()) { toast.error('Job name required'); return; }
 
     const invalidSlides = slides.filter(s => !s.bucket_id);
     if (invalidSlides.length > 0) { toast.error('All slides must have a bucket selected'); return; }
 
+    const pendingTags = hashtagInput
+      .split(',')
+      .map(s => normalizeHashtag(s))
+      .filter(Boolean);
+
+    const finalHashtags = [...hashtags];
+    for (const tag of pendingTags) {
+      if (!finalHashtags.some(h => h.toLowerCase() === tag.toLowerCase())) {
+        finalHashtags.push(tag);
+      }
+    }
+
     setSaving(true);
     try {
       const payload = {
         name,
         general_prompt: generalPrompt || null,
+        hashtags_json: finalHashtags,
         slide_count: slides.length,
         is_active: isActive,
         require_approval: requireApproval,
@@ -117,10 +163,14 @@ export default function JobEditorPage() {
 
       if (isNew) {
         const job = await api.createJob(payload);
+        setHashtagInput('');
+        setHashtags(finalHashtags);
         toast.success('Job created');
         navigate(`/jobs/${job.id}`);
       } else {
         await api.updateJob(id!, payload);
+        setHashtagInput('');
+        setHashtags(finalHashtags);
         toast.success('Job saved');
       }
     } catch (err: any) {
@@ -205,6 +255,47 @@ export default function JobEditorPage() {
                 placeholder="Describe the tone, style, and content direction for this slideshow..."
               />
               <p className="text-xs text-surface-400 mt-1">This prompt applies to all slides. Individual overrides below.</p>
+            </div>
+
+            <div>
+              <label className="label">Hashtags</label>
+              <div className="border border-surface-200 rounded-lg px-3 py-2 bg-white">
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {hashtags.map(tag => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 rounded-full bg-surface-100 px-2.5 py-1 text-xs"
+                    >
+                      #{tag}
+                      <button
+                        type="button"
+                        onClick={() => removeHashtag(tag)}
+                        className="text-surface-400 hover:text-red-500"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <input
+                  className="w-full outline-none text-sm"
+                  value={hashtagInput}
+                  onChange={e => setHashtagInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ',') {
+                      e.preventDefault();
+                      commitHashtagInput();
+                    } else if (e.key === 'Backspace' && !hashtagInput && hashtags.length > 0) {
+                      setHashtags(prev => prev.slice(0, -1));
+                    }
+                  }}
+                  onBlur={commitHashtagInput}
+                  placeholder="Type a hashtag and press Enter or comma"
+                />
+              </div>
+              <p className="text-xs text-surface-400 mt-1">
+                Manual per-job hashtags only. Don’t include # — we’ll format them on export.
+              </p>
             </div>
           </div>
 

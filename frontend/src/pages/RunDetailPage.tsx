@@ -153,17 +153,8 @@ export default function RunDetailPage() {
       )}
 
       {/* Post metadata */}
-      {(run.post_title || run.caption || run.hashtags_json) && (
+      {(run.caption || run.hashtags_json) && (
         <div className="card px-5 py-4 mb-4 space-y-2">
-          {run.post_title && (
-            <div className="flex items-start gap-2">
-              <Type className="w-4 h-4 text-surface-400 mt-0.5 flex-shrink-0" />
-              <div>
-                <span className="text-xs text-surface-400 block">Post Title</span>
-                <span className="text-sm font-medium">{run.post_title}</span>
-              </div>
-            </div>
-          )}
           {run.caption && (
             <div className="flex items-start gap-2">
               <MessageSquare className="w-4 h-4 text-surface-400 mt-0.5 flex-shrink-0" />
